@@ -1,0 +1,44 @@
+{% extends "mining/base.html" %}
+{% block title %}Inspect {{ name }} · Mining Lab{% endblock %}
+{% block content %}
+<h1>{{ name }}</h1>
+<p class="lede">This is the raw file exactly as uploaded. Choose what to predict, then run the pipeline.</p>
+
+<div class="facts">
+  <div><b>{{ s.rows }}</b><span>rows</span></div>
+  <div><b>{{ s.columns }}</b><span>columns ({{ s.numeric_cols|length }} numeric, {{ s.categorical_cols|length }} categorical)</span></div>
+  <div class="{% if s.missing_total %}warn{% else %}ok{% endif %}"><b>{{ s.missing_total }}</b><span>missing cells</span></div>
+  <div class="{% if s.duplicates %}warn{% else %}ok{% endif %}"><b>{{ s.duplicates }}</b><span>duplicate rows</span></div>
+</div>
+
+<h2>First 10 rows</h2>
+<div class="scroll">{{ s.preview_html|safe }}</div>
+
+<h2>Columns</h2>
+<div class="scroll"><table class="grid">
+  <thead><tr><th>Column</th><th>Type</th><th class="num">Distinct values</th><th class="num">Missing</th></tr></thead>
+  <tbody>{% for c in s.columns_info %}
+    <tr><td>{{ c.name }}</td><td>{{ c.dtype }}</td><td class="num">{{ c.unique }}</td>
+        <td class="num">{% if c.missing %}<span class="pill warn">{{ c.missing }} ({{ c.missing_pct }}%)</span>{% else %}<span class="pill ok">0</span>{% endif %}</td></tr>
+  {% endfor %}</tbody>
+</table></div>
+
+<h2>Run the pipeline</h2>
+{% if error %}<div class="alert" role="alert">{{ error }}</div>{% endif %}
+<form method="post" class="panel" id="run-form" style="max-width:560px">
+  {% csrf_token %}
+  <div class="field">
+    <label for="target">Column to predict</label>
+    <select name="target" id="target">
+      {% for c in columns %}<option value="{{ c }}" {% if c == target %}selected{% endif %}>{{ c }}</option>{% endfor %}
+    </select>
+    <small>Text or few-valued columns become a classification task, continuous numbers become regression.</small>
+  </div>
+  <p style="margin:1.1rem 0 0"><button class="btn" type="submit" id="run">Clean data and train model</button></p>
+  <p class="muted" style="margin:.7rem 0 0;font-size:.9rem" id="wait" hidden>Training three models with cross-validation. This takes up to a minute.</p>
+</form>
+<script>
+document.getElementById('run-form').addEventListener('submit',()=>{
+  const b=document.getElementById('run');b.disabled=true;b.textContent='Training…';document.getElementById('wait').hidden=false;});
+</script>
+{% endblock %}

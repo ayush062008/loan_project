@@ -1,0 +1,29 @@
+{% extends "mining/base.html" %}
+{% block title %}Dashboard · Mining Lab{% endblock %}
+{% block content %}
+<h1>Visual analytics</h1>
+<p class="lede">Charts are generated from your uploaded data each time you run the pipeline.</p>
+
+<h2 style="margin-top:1.6rem">Exploring the data</h2>
+<div class="cols-2">
+{% for ch in r.charts.eda %}
+  <figure class="chart {% if ch.file == 'distributions.png' or ch.file == 'boxplots.png' or ch.file == 'categorical.png' %}wide{% endif %}">
+    <h3>{{ ch.title }}</h3>
+    <img src="{{ media }}{{ ch.file }}" alt="{{ ch.title }}" loading="lazy">
+    <figcaption>{{ ch.caption }}</figcaption>
+  </figure>
+{% endfor %}
+</div>
+
+<h2>What the model learned</h2>
+<div class="cols-2">
+{% for ch in r.charts.evaluation %}
+  <figure class="chart">
+    <h3>{{ ch.title }}</h3>
+    <img src="{{ media }}{{ ch.file }}" alt="{{ ch.title }}" loading="lazy">
+    <figcaption>{{ ch.caption }}</figcaption>
+  </figure>
+{% endfor %}
+</div>
+<p style="margin-top:1.5rem"><a class="btn" href="{% url 'predict' run_id %}">Try the model on your own input</a></p>
+{% endblock %}

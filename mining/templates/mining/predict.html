@@ -1,0 +1,102 @@
+{% extends "mining/base.html" %}
+{% block title %}Model and prediction · Mining Lab{% endblock %}
+{% block content %}
+{% with m=r.model %}
+<h1>Model and prediction</h1>
+<p class="lede">{{ m.best_model }} scored best in cross-validation and was evaluated on {{ m.test_rows }} unseen test records.</p>
+
+<div class="predict-grid">
+  <section>
+    <h2 style="margin-top:0">Model performance</h2>
+    <div class="metric-list">
+      {% if r.task == "classification" %}
+        <div class="top"><b>{{ m.metrics.accuracy|floatformat:3 }}</b><span>Accuracy</span></div>
+        <div><b>{{ m.metrics.precision|floatformat:3 }}</b><span>Precision</span></div>
+        <div><b>{{ m.metrics.recall|floatformat:3 }}</b><span>Recall</span></div>
+        <div><b>{{ m.metrics.f1|floatformat:3 }}</b><span>F1-score</span></div>
+        {% if m.metrics.roc_auc %}<div><b>{{ m.metrics.roc_auc|floatformat:3 }}</b><span>ROC AUC</span></div>{% endif %}
+        <div><b>{{ m.metrics.train_accuracy|floatformat:3 }}</b><span>Training accuracy</span></div>
+      {% else %}
+        <div class="top"><b>{{ m.metrics.r2|floatformat:3 }}</b><span>R² score</span></div>
+        <div><b>{{ m.metrics.rmse|floatformat:2 }}</b><span>RMSE</span></div>
+        <div><b>{{ m.metrics.mae|floatformat:2 }}</b><span>MAE</span></div>
+        <div><b>{{ m.metrics.train_r2|floatformat:3 }}</b><span>Training R²</span></div>
+      {% endif %}
+    </div>
+    {% if m.metric_note %}<p class="muted" style="font-size:.88rem">{{ m.metric_note }}</p>{% endif %}
+
+    {% if r.task == "classification" %}
+    <h3 style="margin-top:1.4rem">Confusion matrix</h3>
+    <div class="scroll"><table class="grid">
+      <thead><tr><th>Actual \ Predicted</th>{% for l in m.labels %}<th class="num">{{ l }}</th>{% endfor %}</tr></thead>
+      <tbody>{% for row in m.confusion_rows %}<tr><td><b>{{ row.label }}</b></td>{% for v in row.counts %}<td class="num">{{ v }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+    </table></div>
+    <h3 style="margin-top:1.4rem">Per-class results</h3>
+    <div class="scroll"><table class="grid">
+      <thead><tr><th>Class</th><th class="num">Precision</th><th class="num">Recall</th><th class="num">F1</th><th class="num">Records</th></tr></thead>
+      <tbody>{% for c in m.class_report %}<tr><td>{{ c.label }}</td><td class="num">{{ c.precision }}</td><td class="num">{{ c.recall }}</td><td class="num">{{ c.f1 }}</td><td class="num">{{ c.support }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    {% endif %}
+
+    <h3 style="margin-top:1.4rem">Models compared</h3>
+    <div class="scroll"><table class="grid">
+      <thead><tr><th>Model</th><th class="num">{{ m.score_name }}</th><th></th></tr></thead>
+      <tbody>{% for c in m.comparison %}<tr><td>{{ c.model }}</td><td class="num">{{ c.cv_score }}</td>
+        <td>{% if c.model == m.best_model %}<span class="pill ok">selected</span>{% endif %}</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </section>
+
+  <section class="panel">
+    <h2 style="margin-top:0">Predict a new record</h2>
+    <p class="muted">Enter values for each feature. Fields start with typical values from your data.</p>
+    <form id="pform" novalidate>
+      {% csrf_token %}
+      <div class="form-grid">
+      {% for f in r.form %}
+        <div class="field">
+          <label for="f_{{ forloop.counter }}">{{ f.name }}</label>
+          {% if f.kind == "select" %}
+            <select id="f_{{ forloop.counter }}" name="{{ f.name }}">
+              {% for o in f.options %}<option value="{{ o }}" {% if o == f.default %}selected{% endif %}>{{ o }}</option>{% endfor %}
+            </select>
+          {% else %}
+            <input id="f_{{ forloop.counter }}" name="{{ f.name }}" type="number" inputmode="decimal"
+                   step="{% if f.integer %}1{% else %}any{% endif %}" value="{{ f.default }}">
+            <small>Seen in data: {{ f.min }} to {{ f.max }}</small>
+          {% endif %}
+        </div>
+      {% endfor %}
+      </div>
+      <p style="margin:1.3rem 0 0"><button class="btn" type="submit" id="pbtn">Predict {{ r.target }}</button></p>
+    </form>
+    <div class="result" id="result" role="status" aria-live="polite"></div>
+  </section>
+</div>
+
+<script>
+const form=document.getElementById('pform'),box=document.getElementById('result'),btn=document.getElementById('pbtn');
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+form.addEventListener('submit',async ev=>{
+  ev.preventDefault();
+  const body={};new FormData(form).forEach((v,k)=>{if(k!=='csrfmiddlewaretoken')body[k]=v});
+  btn.disabled=true;
+  try{
+    const resp=await fetch("{% url 'predict_api' run_id %}",{method:'POST',
+      headers:{'Content-Type':'application/json','X-CSRFToken':form.csrfmiddlewaretoken.value},body:JSON.stringify(body)});
+    const d=await resp.json();
+    box.className='result show'+(resp.ok?'':' err');
+    if(!resp.ok){box.textContent=d.error||'Something went wrong.';return}
+    let html='<div class="lab">Predicted '+esc(d.target)+'</div><div class="big">'+esc(d.prediction)+'</div>';
+    if(d.probabilities){
+      html+='<div class="prob">';
+      Object.entries(d.probabilities).sort((a,b)=>b[1]-a[1]).forEach(([k,p])=>{
+        html+='<div class="row"><span>'+esc(k)+'</span><span class="bar"><i style="width:'+(p*100).toFixed(1)+'%"></i></span><span>'+(p*100).toFixed(1)+'%</span></div>';});
+      html+='</div>';
+    }
+    box.innerHTML=html;
+  }catch(e){box.className='result show err';box.textContent='Could not reach the server.';}
+  finally{btn.disabled=false}
+});
+</script>
+{% endwith %}
+{% endblock %}

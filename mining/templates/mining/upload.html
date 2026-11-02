@@ -1,0 +1,37 @@
+{% extends "mining/base.html" %}
+{% block title %}Upload a dataset · Mining Lab{% endblock %}
+{% block content %}
+<h1>Upload a dataset</h1>
+<p class="lede">Add a raw CSV or Excel file. Nothing needs to be cleaned first: duplicates, missing cells and outliers are handled for you.</p>
+
+{% if error %}<div class="alert" role="alert">{{ error }}</div>{% endif %}
+
+<form method="post" enctype="multipart/form-data" id="upload-form">
+  {% csrf_token %}
+  <label class="drop" id="drop">
+    <input type="file" name="file" id="file" accept=".csv,.xlsx,.xls" required>
+    <strong>Drop a file here, or click to choose one</strong>
+    <span class="muted">.csv, .xlsx or .xls, up to 25 MB</span>
+    <div class="fname" id="fname"></div>
+  </label>
+  <p style="margin-top:1.2rem;display:flex;gap:.8rem;flex-wrap:wrap;align-items:center">
+    <button class="btn" type="submit" id="go">Upload and inspect</button>
+    {% if has_sample %}<a class="btn ghost" href="{% url 'use_sample' %}">Try the sample loan dataset</a>{% endif %}
+  </p>
+</form>
+
+<div class="requirements">
+  <div><h3>Mixed columns</h3><p class="muted">Works best with both numbers and categories, such as income and property area.</p></div>
+  <div><h3>One outcome column</h3><p class="muted">You pick the column to predict next: approved or not, churned or not, a price.</p></div>
+  <div><h3>500 rows or more</h3><p class="muted">Small files train, but the metrics become unreliable below a few hundred records.</p></div>
+</div>
+
+<script>
+const drop=document.getElementById('drop'),file=document.getElementById('file'),fname=document.getElementById('fname');
+file.addEventListener('change',()=>{fname.textContent=file.files[0]?file.files[0].name:''});
+['dragenter','dragover'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.add('over')}));
+['dragleave','drop'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.remove('over')}));
+drop.addEventListener('drop',ev=>{if(ev.dataTransfer.files.length){file.files=ev.dataTransfer.files;file.dispatchEvent(new Event('change'))}});
+document.getElementById('upload-form').addEventListener('submit',()=>{const b=document.getElementById('go');b.disabled=true;b.textContent='Uploading…'});
+</script>
+{% endblock %}

@@ -1,0 +1,40 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Loan Mining Lab{% endblock %}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'mining/style.css' %}">
+</head>
+<body>
+<div class="shell">
+  <nav class="rail" aria-label="Pipeline stages">
+    <a class="brand" href="{% url 'upload' %}">Mining Lab</a>
+    <div class="brand-sub">Upload, clean, learn, predict</div>
+    <ol class="steps">
+      <li class="{% if tab == 'upload' %}now{% elif run_id %}done{% endif %}">
+        <span class="dot">1</span><a href="{% url 'upload' %}">Upload<small>CSV or Excel file</small></a></li>
+      <li class="{% if tab == 'dataset' %}now{% elif r %}done{% endif %}">
+        <span class="dot">2</span>
+        {% if run_id %}<a href="{% url 'dataset' run_id %}">Inspect<small>Preview and pick target</small></a>
+        {% else %}<span class="lbl">Inspect<small>Preview and pick target</small></span>{% endif %}</li>
+      <li class="{% if tab == 'summary' %}now{% elif r %}done{% endif %}">
+        <span class="dot">3</span>
+        {% if r %}<a href="{% url 'summary' run_id %}">Preprocessing<small>What was cleaned</small></a>
+        {% else %}<span class="lbl">Preprocessing<small>What was cleaned</small></span>{% endif %}</li>
+      <li class="{% if tab == 'dashboard' %}now{% elif r %}done{% endif %}">
+        <span class="dot">4</span>
+        {% if r %}<a href="{% url 'dashboard' run_id %}">Dashboard<small>Charts and patterns</small></a>
+        {% else %}<span class="lbl">Dashboard<small>Charts and patterns</small></span>{% endif %}</li>
+      <li class="{% if tab == 'predict' %}now{% endif %}">
+        <span class="dot">5</span>
+        {% if r %}<a href="{% url 'predict' run_id %}">Model and predict<small>Metrics and live form</small></a>
+        {% else %}<span class="lbl">Model and predict<small>Metrics and live form</small></span>{% endif %}</li>
+    </ol>
+  </nav>
+  <main>{% block content %}{% endblock %}</main>
+</div>
+</body>
+</html>

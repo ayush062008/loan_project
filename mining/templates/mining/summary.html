@@ -1,0 +1,72 @@
+{% extends "mining/base.html" %}
+{% block title %}Preprocessing · Mining Lab{% endblock %}
+{% block content %}
+{% with c=r.clean %}
+<h1>Preprocessing summary</h1>
+<p class="lede">Predicting <b>{{ r.target }}</b> as a {{ r.task }} task from {{ r.features|length }} selected features.</p>
+
+<div class="facts">
+  <div><b>{{ c.shape_before.0 }} → {{ c.shape_after.0 }}</b><span>rows</span></div>
+  <div><b>{{ c.shape_before.1 }} → {{ c.shape_after.1 }}</b><span>columns</span></div>
+  <div class="hl"><b>{{ c.missing_before_total }} → {{ c.missing_after_total }}</b><span>missing cells</span></div>
+  <div class="hl"><b>{{ c.duplicates_removed }}</b><span>duplicate rows removed</span></div>
+</div>
+<p><a class="btn" href="{% url 'dashboard' run_id %}">See the charts</a>
+   <a class="btn ghost" href="{% url 'predict' run_id %}">Go to prediction</a></p>
+
+<h2>Missing values after processing</h2>
+<p class="muted">Every column should read zero. Numeric gaps were filled with the mean or median, category gaps with the most frequent value.</p>
+<div class="cols-2">
+  <div class="scroll"><table class="grid">
+    <thead><tr><th>Column</th><th class="num">Missing now</th></tr></thead>
+    <tbody>{% for m in r.clean_missing %}<tr><td>{{ m.column }}</td>
+      <td class="num">{% if m.missing %}<span class="pill warn">{{ m.missing }}</span>{% else %}<span class="pill ok">0</span>{% endif %}</td></tr>{% endfor %}</tbody>
+  </table></div>
+  <div class="scroll"><table class="grid">
+    <thead><tr><th>Column</th><th class="num">Was missing</th><th>Filled with</th></tr></thead>
+    <tbody>{% for col, how in c.imputation.items %}<tr><td>{{ col }}</td>
+      <td class="num">{% for k, v in c.missing_before.items %}{% if k == col %}{{ v }}{% endif %}{% endfor %}</td><td>{{ how }}</td></tr>
+      {% empty %}<tr><td colspan="3">No missing values were found.</td></tr>{% endfor %}</tbody>
+  </table></div>
+</div>
+
+<h2>Outliers</h2>
+<p class="muted">Detected with the IQR rule (beyond 1.5×IQR from the quartiles) and the Z-score rule (|z| above 3). Values outside the IQR fences were capped rather than deleted, so no rows are lost.</p>
+<div class="scroll"><table class="grid">
+  <thead><tr><th>Column</th><th class="num">IQR outliers</th><th class="num">Z-score outliers</th><th class="num">Lower fence</th><th class="num">Upper fence</th><th>Treatment</th></tr></thead>
+  <tbody>{% for o in c.outliers %}<tr><td>{{ o.column }}</td><td class="num">{{ o.iqr_outliers }}</td><td class="num">{{ o.zscore_outliers }}</td>
+    <td class="num">{{ o.lower }}</td><td class="num">{{ o.upper }}</td><td>{{ o.treatment }}</td></tr>
+    {% empty %}<tr><td colspan="6">No continuous numeric columns to check.</td></tr>{% endfor %}</tbody>
+</table></div>
+
+<h2>Cleaning and feature selection</h2>
+<div class="cols-2">
+  <div class="panel"><h3>Irrelevant fields removed</h3>
+    {% if c.dropped_columns %}<ul>{% for col, why in c.dropped_columns.items %}<li><b>{{ col }}</b>: {{ why }}</li>{% endfor %}</ul>
+    {% else %}<p class="muted">None needed.</p>{% endif %}
+    {% if c.rows_dropped_missing_target %}<p>{{ c.rows_dropped_missing_target }} rows had no value for the target and were dropped.</p>{% endif %}
+  </div>
+  <div class="panel"><h3>Redundant features removed</h3>
+    {% if r.feature_selection.removed_redundant %}<ul>{% for d in r.feature_selection.removed_redundant %}
+      <li><b>{{ d.dropped }}</b> duplicates <b>{{ d.kept }}</b> (correlation {{ d.r }})</li>{% endfor %}</ul>
+    {% else %}<p class="muted">No pair of numeric features was correlated above 0.9.</p>{% endif %}
+  </div>
+</div>
+
+<h2>Correlation with {{ r.target }}</h2>
+<div class="scroll"><table class="grid">
+  <thead><tr><th>Feature</th><th class="num">Correlation with target</th></tr></thead>
+  <tbody>{% for d in r.feature_selection.target_correlation %}<tr><td>{{ d.feature }}</td><td class="num">{{ d.correlation }}</td></tr>{% endfor %}</tbody>
+</table></div>
+<p class="muted" style="margin-top:.6rem">Category columns are label-coded for this check only. The model itself uses one-hot encoding.</p>
+
+<h2>Transformation applied inside the model</h2>
+<p>Numeric features are standardised with <code>StandardScaler</code> (mean 0, spread 1). Category features are expanded with <code>OneHotEncoder</code>. Both steps live in the saved scikit-learn pipeline, so a record typed into the prediction form is transformed exactly like the training data.</p>
+
+<h2>Cleaned data, first 10 rows</h2>
+<div class="scroll">{{ r.clean_preview_html|safe }}</div>
+
+<h2>Numeric statistics after cleaning</h2>
+<div class="scroll">{{ r.describe_html|safe }}</div>
+{% endwith %}
+{% endblock %}
